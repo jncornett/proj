@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-from setuptools import setup
+from setuptools import setup, find_packages
 
 setup(
     name="Proj",
@@ -8,8 +8,7 @@ setup(
     author="Joel Cornett",
     author_email="joel.cornett@gmail.com",
     url="https://github.com/jncornett/proj",
-    install_requires=["pyaml", "gitpython"],
-    entry_points={"console_scripts": ["proj = proj:main"]},
-    package_data={"proj": ["templates"]},
-    py_modules=["proj"]
+    packages=find_packages(),
+    entry_points={"console_scripts": ["proj = proj.script:main"]},
+    package_data={"proj": ["data/templates"]},
 )

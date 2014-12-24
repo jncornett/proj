@@ -1,37 +1,8 @@
-#!/usr/bin/env python
-
 import json
 import logging
 import os
-from subprocess import check_call
-
-logger = logging.getLogger(__name__)
-
-ROOT_TEMPLATE_NAME = "root.json"
-CONFIG_FILENAME = ".proj.json"
-USER_PATH = os.path.expanduser("~")
-CONFIG_PATH = os.path.join(USER_PATH, CONFIG_FILENAME)
-DEFAULT_TEMPLATE_DIR = os.path.join(USER_PATH, ".proj")
-DEFAULTS = {
-    "template_dir": DEFAULT_TEMPLATE_DIR
-}
-
-DOC = """\
-Feel free to edit the configuration file at {CONFIG_PATH}
-""".format(**vars())
-
-def mkdirp(path):
-    try:
-        os.makedirs(path)
-    except os.error:
-        if not os.path.exists(path):
-            raise
-
-
-def touch(path):
-    with open(path, "a"):
-        os.utime(path)
-
+from subprocess import check_call, CalledProcessError
+from .util import mkdirp, touch
 
 class FSObject(object):
     def __init__(self, name, contents=None):
@@ -147,63 +118,3 @@ class Project(object):
             yield shell_commands[key]
 
 
-def get_available_templates(template_dir):
-    mkdirp(template_dir)
-    return os.listdir(template_dir)
-
-
-def get_parser(config):
-    import argparse
-    parser = argparse.ArgumentParser(epilog=DOC)
-    parser.add_argument("-q", "--quiet", action="store_const",
-                        dest="log_level", const=logging.WARNING,
-                        default=logging.INFO, help="Suppress (most) logging")
-    parser.add_argument("--debug", action="store_const", dest="log_level",
-                        const=logging.DEBUG, help="Turn on debug messages")
-    parser.add_argument("-n", "--dry-run", action="store_true",
-                        help="Don't actually do anything")
-    parser.add_argument("-j", "--json", action="append",
-                        help="Specify additional configuration files")
-    parser.add_argument("-r", "--root", default=os.getcwd(),
-                        help="Specify a root directory for the project")
-    parser.add_argument("template", 
-                        choices=get_available_templates(config["template_dir"]),
-                        help="Template to use")
-    parser.add_argument("name", help="Name of project to create")
-    return parser
-
-
-def get_config(*filenames):
-    master = {}
-    for filename in filenames:
-        try:
-            with open(filename, "rb") as f:
-                config = json.load(f)
-        except (OSError, IOError):
-            config = {}
-        
-        master.update(config)
-
-    return master
-
-
-def main():
-    config = dict(DEFAULTS, **get_config(CONFIG_PATH))
-    cmdline_config = vars(get_parser(config).parse_args())
-    
-    if cmdline_config["json"]:
-        config.update(get_config(*cmdline_config["json"]))
-
-    config.update(cmdline_config)
-
-    logging.basicConfig(level=config["log_level"])
-
-    project = Project(
-        config["name"], 
-        os.path.join(config["template_dir"], config["template"])
-        )
-
-    project.init(config, config["dry_run"])
-
-if __name__ == "__main__":
-    main()
