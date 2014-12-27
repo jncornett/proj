@@ -1,0 +1,15 @@
+{
+  "{name}.py": null,
+  "setup.py": "@setup",
+  "test.py": {
+    "template_strings": [
+      "from unittest import TestCase",
+      "import {name}",
+      {"@": ["unittest-generate"]}
+    ]
+  },
+  "doc": {},
+  "@": "git-setup",
+  "!": ["docco -o doc {name}.py"]
+}
+

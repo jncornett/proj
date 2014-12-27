@@ -10,5 +10,5 @@ setup(
     url="https://github.com/jncornett/proj",
     packages=find_packages(),
     entry_points={"console_scripts": ["proj = proj.script:main"]},
-    package_data={"proj": ["data/templates"]},
+    package_data={"proj": ["data"]},
 )
