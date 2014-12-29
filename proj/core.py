@@ -3,7 +3,8 @@ import os
 from abc import ABCMeta, abstractmethod, abstractproperty
 from subprocess import check_call
 
-from .util import touch, mkdirp
+from .util import touch, mkdirp, find_dirs_containing
+from .plugin import PluginManager
 
 logger = logging.getLogger(__name__)
 
@@ -155,3 +156,38 @@ class ShellCommand(Node):
 
     def render(self):
         check_call(self._format_cmd(), cwd=self.module_path)
+
+
+def _preprocess(key, value):
+    pass
+
+
+def _build(hooks, data, **config):
+    if isinstance(data, list):
+        for item in data:
+            yield _build(hooks, item, **config)
+    else:
+        for key, value in data.items():
+            key, value = preprocess(key, value)
+
+            node_cls, node_data, node_args, node_kwargs = None, value, (key,), {}
+            if hooks:
+                rv = hooks.trigger("get_node", key, value)
+                if rv:
+                    node_cls, node_name, node_data = rv
+
+            if node_cls is None:
+                # Use builtin handlers
+                pass
+
+            # Dispatch
+            if issubclass(node_cls, Branch):
+                node_kwargs["contents"] = _build(hooks, node_data, **config)
+
+            yield node_cls(*node_args, **node_kwargs)
+
+
+
+def build_template(hooks, name, data, **config):
+    contents = _build(hooks, data, **config)
+    return Directory(name, contents=contents, **config)
