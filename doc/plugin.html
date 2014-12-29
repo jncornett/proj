@@ -1,0 +1,184 @@
+<!DOCTYPE html>
+
+<html>
+<head>
+  <title>plugin.py</title>
+  <meta http-equiv="content-type" content="text/html; charset=UTF-8">
+  <meta name="viewport" content="width=device-width, target-densitydpi=160dpi, initial-scale=1.0; maximum-scale=1.0; user-scalable=0;">
+  <link rel="stylesheet" media="all" href="docco.css" />
+</head>
+<body>
+  <div id="container">
+    <div id="background"></div>
+    
+      <ul id="jump_to">
+        <li>
+          <a class="large" href="javascript:void(0);">Jump To &hellip;</a>
+          <a class="small" href="javascript:void(0);">+</a>
+          <div id="jump_wrapper">
+          <div id="jump_page">
+            
+              
+              <a class="source" href="__init__.html">
+                __init__.py
+              </a>
+            
+              
+              <a class="source" href="core.html">
+                core.py
+              </a>
+            
+              
+              <a class="source" href="plugin.html">
+                plugin.py
+              </a>
+            
+              
+              <a class="source" href="script.html">
+                script.py
+              </a>
+            
+              
+              <a class="source" href="util.html">
+                util.py
+              </a>
+            
+          </div>
+        </li>
+      </ul>
+    
+    <ul class="sections">
+        
+          <li id="title">
+              <div class="annotation">
+                  <h1>plugin.py</h1>
+              </div>
+          </li>
+        
+        
+        
+        <li id="section-1">
+            <div class="annotation">
+              
+              <div class="pilwrap ">
+                <a class="pilcrow" href="#section-1">&#182;</a>
+              </div>
+              
+            </div>
+            
+            <div class="content"><div class='highlight'><pre><span class="hljs-keyword">import</span> imp
+<span class="hljs-keyword">import</span> logging
+<span class="hljs-keyword">import</span> os
+<span class="hljs-keyword">from</span> itertools <span class="hljs-keyword">import</span> chain
+
+dbg = logging.getLogger(<span class="hljs-string">"debug"</span>)
+
+<span class="hljs-class"><span class="hljs-keyword">class</span> <span class="hljs-title">PluginManager</span><span class="hljs-params">(object)</span>:</span>
+
+    HOOKS = set() <span class="hljs-comment"># A set of hook names to register</span>
+
+    <span class="hljs-function"><span class="hljs-keyword">def</span> <span class="hljs-title">__init__</span><span class="hljs-params">(self, app, plugin_paths, 
+                 debug=False, logger=None)</span>:</span>
+
+        <span class="hljs-keyword">if</span> logger <span class="hljs-keyword">is</span> <span class="hljs-keyword">None</span>:
+            self.logger = logging.getLogger(self.__class__.__name__)
+        <span class="hljs-keyword">else</span>:
+            self.logger = logger.getChild(self.__class__.__name__)
+
+        self.app = app
+        self.debug = debug <span class="hljs-comment"># Determine whether to fail on error</span>
+        self.modules = list(self._load_plugins(plugin_paths))
+        self.plugins = list(self._init_plugins())
+        self.hooks = self._register_hooks()
+    
+
+    <span class="hljs-function"><span class="hljs-keyword">def</span> <span class="hljs-title">_init_plugins</span><span class="hljs-params">(self)</span>:</span>
+        <span class="hljs-keyword">for</span> module <span class="hljs-keyword">in</span> self.modules:
+            plugin_classes = []
+            <span class="hljs-keyword">for</span> obj_name <span class="hljs-keyword">in</span> dir(module):
+                obj = getattr(module, obj_name)
+                <span class="hljs-keyword">try</span>:
+                    <span class="hljs-keyword">if</span> issubclass(obj, Plugin):
+                        plugin_classes.append(obj)
+                <span class="hljs-keyword">except</span> TypeError:
+                    <span class="hljs-keyword">pass</span>
+
+            <span class="hljs-keyword">for</span> cls <span class="hljs-keyword">in</span> plugin_classes:
+                <span class="hljs-keyword">try</span>:
+                    <span class="hljs-keyword">yield</span> cls(self.app)
+                <span class="hljs-keyword">except</span> Exception <span class="hljs-keyword">as</span> e:
+                    self._log_plugin_exception(e, **{<span class="hljs-string">"class"</span>: cls})
+                    <span class="hljs-keyword">if</span> self.debug:
+                        <span class="hljs-keyword">raise</span>
+
+
+    <span class="hljs-function"><span class="hljs-keyword">def</span> <span class="hljs-title">_register_hooks</span><span class="hljs-params">(self)</span>:</span>
+        <span class="hljs-keyword">for</span> plugin <span class="hljs-keyword">in</span> self.plugins:
+            <span class="hljs-keyword">for</span> key <span class="hljs-keyword">in</span> plugin.hooks:
+                <span class="hljs-keyword">if</span> key <span class="hljs-keyword">in</span> self.HOOKS:
+                    self.hooks.setdefault(key, []).append(plugin.hooks[key])
+
+
+    <span class="hljs-function"><span class="hljs-keyword">def</span> <span class="hljs-title">_get_modules</span><span class="hljs-params">(self, path)</span>:</span>
+        <span class="hljs-keyword">for</span> entry <span class="hljs-keyword">in</span> os.listdir(path):
+            base, ext = os.path.splitext(entry)
+            <span class="hljs-keyword">if</span> <span class="hljs-keyword">not</span> ext <span class="hljs-keyword">or</span> ext == <span class="hljs-string">".py"</span>:
+                mod_info = (_, _, mod_file, _) = imp.find_module(base, path)
+                <span class="hljs-keyword">if</span> mod_info:
+                    <span class="hljs-keyword">try</span>:
+                        <span class="hljs-keyword">yield</span> imp.load_module(base, *mod_info)
+                    <span class="hljs-keyword">except</span> Exception <span class="hljs-keyword">as</span> e:
+                        self._log_plugin_exception(e, module_info=mod_info)
+                        <span class="hljs-keyword">if</span> self.debug:
+                            <span class="hljs-keyword">raise</span>
+                    <span class="hljs-keyword">finally</span>:
+                        mod_file.close()
+
+
+    <span class="hljs-function"><span class="hljs-keyword">def</span> <span class="hljs-title">_load_plugins</span><span class="hljs-params">(self, plugin_paths)</span>:</span>
+         <span class="hljs-keyword">return</span> chain(
+            *(self._get_modules(path) 
+                <span class="hljs-keyword">for</span> path <span class="hljs-keyword">in</span> plugin_paths)
+            )
+
+
+    <span class="hljs-function"><span class="hljs-keyword">def</span> <span class="hljs-title">_log_plugin_exception</span><span class="hljs-params">(self, e, **kwargs)</span>:</span>
+        self.logger.error(<span class="hljs-string">"Exception: %s, Kwargs: %s"</span>, e, kwargs)
+
+
+    <span class="hljs-function"><span class="hljs-keyword">def</span> <span class="hljs-title">trigger</span><span class="hljs-params">(self, hook, *args, **kwargs)</span>:</span>
+        hook_fns = self.hooks[hook]
+        rv = <span class="hljs-keyword">None</span>
+        <span class="hljs-keyword">for</span> fn <span class="hljs-keyword">in</span> hook_fns:
+            <span class="hljs-keyword">try</span>:
+                rv = fn(self.app, rv, *args, **kwargs)
+            <span class="hljs-keyword">except</span> Exception <span class="hljs-keyword">as</span> e:
+                self._log_plugin_exception(e, hook=hook, fn=fn)
+                <span class="hljs-keyword">if</span> self.debug:
+                    <span class="hljs-keyword">raise</span>
+
+        <span class="hljs-keyword">return</span> rv
+
+
+<span class="hljs-class"><span class="hljs-keyword">class</span> <span class="hljs-title">Plugin</span><span class="hljs-params">(object)</span>:</span>
+
+    hooks = {}
+
+    <span class="hljs-function"><span class="hljs-keyword">def</span> <span class="hljs-title">__init__</span><span class="hljs-params">(self, app)</span>:</span>
+        self.app = app
+
+
+    <span class="hljs-decorator">@classmethod</span>
+    <span class="hljs-function"><span class="hljs-keyword">def</span> <span class="hljs-title">hook</span><span class="hljs-params">(cls, hook_name)</span>:</span>
+        <span class="hljs-function"><span class="hljs-keyword">def</span> <span class="hljs-title">inner</span><span class="hljs-params">(fn)</span>:</span>
+            cls.hooks.setdefault(hook_name, []).append(fn.__name__)
+            <span class="hljs-keyword">return</span> fn
+
+        <span class="hljs-keyword">return</span> inner</pre></div></div>
+            
+        </li>
+        
+    </ul>
+  </div>
+</body>
+</html>

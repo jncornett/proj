@@ -1,0 +1,211 @@
+<!DOCTYPE html>
+
+<html>
+<head>
+  <title>script.py</title>
+  <meta http-equiv="content-type" content="text/html; charset=UTF-8">
+  <meta name="viewport" content="width=device-width, target-densitydpi=160dpi, initial-scale=1.0; maximum-scale=1.0; user-scalable=0;">
+  <link rel="stylesheet" media="all" href="docco.css" />
+</head>
+<body>
+  <div id="container">
+    <div id="background"></div>
+    
+      <ul id="jump_to">
+        <li>
+          <a class="large" href="javascript:void(0);">Jump To &hellip;</a>
+          <a class="small" href="javascript:void(0);">+</a>
+          <div id="jump_wrapper">
+          <div id="jump_page">
+            
+              
+              <a class="source" href="__init__.html">
+                __init__.py
+              </a>
+            
+              
+              <a class="source" href="core.html">
+                core.py
+              </a>
+            
+              
+              <a class="source" href="plugin.html">
+                plugin.py
+              </a>
+            
+              
+              <a class="source" href="script.html">
+                script.py
+              </a>
+            
+              
+              <a class="source" href="util.html">
+                util.py
+              </a>
+            
+          </div>
+        </li>
+      </ul>
+    
+    <ul class="sections">
+        
+          <li id="title">
+              <div class="annotation">
+                  <h1>script.py</h1>
+              </div>
+          </li>
+        
+        
+        
+        <li id="section-1">
+            <div class="annotation">
+              
+              <div class="pilwrap ">
+                <a class="pilcrow" href="#section-1">&#182;</a>
+              </div>
+              
+            </div>
+            
+            <div class="content"><div class='highlight'><pre><span class="hljs-comment">#!/usr/bin/env python</span>
+
+<span class="hljs-keyword">import</span> os
+<span class="hljs-keyword">from</span> pkg_resources <span class="hljs-keyword">import</span> resource_filename
+<span class="hljs-keyword">from</span> .core <span class="hljs-keyword">import</span> *
+<span class="hljs-keyword">import</span> logging
+
+logger = logging.getLogger(__name__)
+
+ROOT_TEMPLATE_NAME = <span class="hljs-string">"root.json"</span>
+CONFIG_FILENAME = <span class="hljs-string">".proj.json"</span>
+USER_PATH = os.path.expanduser(<span class="hljs-string">"~"</span>)
+CONFIG_PATH = os.path.join(USER_PATH, CONFIG_FILENAME)
+PACKAGE_TEMPLATE_DIR = <span class="hljs-string">"data/templates"</span>
+DEFAULT_USER_TEMPLATE_DIR = os.path.join(USER_PATH, <span class="hljs-string">".proj"</span>)
+DEFAULTS = {
+    <span class="hljs-string">"template_dir"</span>: DEFAULT_USER_TEMPLATE_DIR
+}
+
+DOC = <span class="hljs-string">"""\
+To set user defaults, create/edit a JSON file at {CONFIG_PATH}.
+To add custom project templates, create/edit the subfolder under
+{{template_dir}}. 
+Each template must contain a {ROOT_TEMPLATE_NAME}.
+For information on the JSON structure of {ROOT_TEMPLATE_NAME},
+see [TODO: Add {ROOT_TEMPLATE_NAME} documentation].
+"""</span>.format(**vars())
+
+
+<span class="hljs-function"><span class="hljs-keyword">def</span> <span class="hljs-title">_get_templates</span><span class="hljs-params">(path)</span>:</span>
+    templates = {}
+    <span class="hljs-keyword">for</span> dirpath, dirnames, filenames <span class="hljs-keyword">in</span> os.walk(path):
+        <span class="hljs-keyword">if</span> ROOT_TEMPLATE_NAME <span class="hljs-keyword">in</span> filenames:
+            template_key = os.path.relpath(dirpath, path)
+            templates[template_key] = dirpath
+            dirnames[:] = [] <span class="hljs-comment"># Stop recursing in this tree</span>
+
+    <span class="hljs-keyword">return</span> templates
+
+
+<span class="hljs-function"><span class="hljs-keyword">def</span> <span class="hljs-title">get_available_templates</span><span class="hljs-params">(user_template_path)</span>:</span>
+    pkg_template_path = resource_filename(
+        __name__,
+        PACKAGE_TEMPLATE_DIR
+        )
+
+    templates = _get_templates(pkg_template_path)
+    
+    <span class="hljs-keyword">if</span> os.path.isdir(user_template_path):
+        templates.update(_get_templates(user_template_path))
+    <span class="hljs-keyword">elif</span> os.path.exists(user_template_path):
+        logger.warn(<span class="hljs-string">"User template path [%s] is a file"</span>,
+                user_template_path)
+
+    <span class="hljs-keyword">return</span> templates
+
+
+<span class="hljs-function"><span class="hljs-keyword">def</span> <span class="hljs-title">get_parser</span><span class="hljs-params">(config)</span>:</span>
+    <span class="hljs-keyword">import</span> argparse
+    parser = argparse.ArgumentParser(
+        formatter_class=argparse.ArgumentDefaultsHelpFormatter,
+        epilog=DOC
+        )
+
+    parser.add_argument(
+        <span class="hljs-string">"-q"</span>, <span class="hljs-string">"--quiet"</span>, action=<span class="hljs-string">"store_const"</span>,
+        dest=<span class="hljs-string">"log_level"</span>, const=logging.WARNING,
+        default=logging.INFO, help=<span class="hljs-string">"Suppress (most) logging"</span>
+        )
+
+    parser.add_argument(
+        <span class="hljs-string">"--debug"</span>, action=<span class="hljs-string">"store_const"</span>, dest=<span class="hljs-string">"log_level"</span>,
+        const=logging.DEBUG, help=<span class="hljs-string">"Turn on debug messages"</span>
+        )
+
+    parser.add_argument(<span class="hljs-string">"-n"</span>, <span class="hljs-string">"--dry-run"</span>, action=<span class="hljs-string">"store_true"</span>,
+                        help=<span class="hljs-string">"Don't actually do anything"</span>)
+
+    parser.add_argument(
+        <span class="hljs-string">"-j"</span>, <span class="hljs-string">"--json"</span>, action=<span class="hljs-string">"append"</span>,
+        help=<span class="hljs-string">"Specify additional configuration files"</span>
+        )
+
+    parser.add_argument(
+        <span class="hljs-string">"-r"</span>, <span class="hljs-string">"--root"</span>, default=os.getcwd(),
+        help=<span class="hljs-string">"Specify a root directory for the project"</span>
+        )
+
+    parser.add_argument(
+        <span class="hljs-string">"template"</span>, 
+        choices=get_available_templates(
+            config[<span class="hljs-string">"template_dir"</span>]
+            ),
+        help=<span class="hljs-string">"Template to use"</span>
+        )
+
+    parser.add_argument(
+        <span class="hljs-string">"name"</span>, help=<span class="hljs-string">"Name of project to create"</span>)
+
+    <span class="hljs-keyword">return</span> parser
+
+
+<span class="hljs-function"><span class="hljs-keyword">def</span> <span class="hljs-title">get_config</span><span class="hljs-params">(*filenames)</span>:</span>
+    master = {}
+    <span class="hljs-keyword">for</span> filename <span class="hljs-keyword">in</span> filenames:
+        <span class="hljs-keyword">try</span>:
+            <span class="hljs-keyword">with</span> open(filename, <span class="hljs-string">"rb"</span>) <span class="hljs-keyword">as</span> f:
+                config = json.load(f)
+        <span class="hljs-keyword">except</span> (OSError, IOError):
+            config = {}
+        
+        master.update(config)
+
+    <span class="hljs-keyword">return</span> master
+
+
+<span class="hljs-function"><span class="hljs-keyword">def</span> <span class="hljs-title">main</span><span class="hljs-params">()</span>:</span>
+    config = dict(DEFAULTS, **get_config(CONFIG_PATH))
+    cmdline_config = vars(get_parser(config).parse_args())
+    
+    <span class="hljs-keyword">if</span> cmdline_config[<span class="hljs-string">"json"</span>]:
+        config.update(get_config(*cmdline_config[<span class="hljs-string">"json"</span>]))
+
+    config.update(cmdline_config)
+
+    logging.basicConfig(level=config[<span class="hljs-string">"log_level"</span>])
+
+    project = Project(
+        config[<span class="hljs-string">"name"</span>], 
+        os.path.join(config[<span class="hljs-string">"template_dir"</span>], config[<span class="hljs-string">"template"</span>])
+        )
+
+    project.init(config, config[<span class="hljs-string">"dry_run"</span>])
+
+<span class="hljs-keyword">if</span> __name__ == <span class="hljs-string">"__main__"</span>:
+    main()</pre></div></div>
+            
+        </li>
+        
+    </ul>
+  </div>
+</body>
+</html>
