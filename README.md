@@ -77,3 +77,12 @@ Details
     }
     
   More to come...
+
+TODO
+----
+- Write console script (`proj/script.py`)
+- Default implementation + preprocess JSON
+- Write example plugins for each hook
+- Logging for all modules in package
+- Documentation for all modules in package
+- Complete unit tests
