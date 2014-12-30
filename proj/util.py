@@ -11,7 +11,7 @@ def mkdirp(path):
 def touch(path, text=None):
     with open(path, "a") as f:
         if text is None:
-            os.utime(path)
+            os.utime(path, None)
         else:
             f.write(text)
 

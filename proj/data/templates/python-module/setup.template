@@ -1,9 +1,0 @@
-{shebang.python}
-from setuptools import setup
-setup(
-    name="{name}",
-    author="{author_name}",
-    author_email="{author_email}",
-    url="https://github.com/{author_github}/{name}",
-    py_modules=["{name}"]
-    )

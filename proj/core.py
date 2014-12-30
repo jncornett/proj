@@ -197,21 +197,26 @@ class ShellCommand(Node):
 
 
 class Maker(object):
+    # TODO: Add logger to Maker
     def __init__(self, name, structure, templates, **config):
         self.data = config.pop("data", {})
         self.hooks = config.pop("plugin_manager", None)
+        parentLogger = config.pop("logger", logging)
+        self.logger = parentLogger.getChild(self.__class__.__name__)
         self.template_path = templates
         self.config = config
         self.root = Directory(name, contents=self._build(structure))
 
     
     def _get_template(self, name):
-        template_filename = os.path.relpath(self.template_path, name)
+        self.logger.debug("Fetching template for %r", name)
+        template_filename = os.path.abspath(os.path.join(self.template_path, name))
         with open(template_filename) as f:
             return f.read()
 
 
     def _build(self, structure):
+        self.logger.debug("Parsing structure %s", structure)
         if hasattr(structure, "items"):
             for key, value in structure.items():
                 rv = self.hooks.trigger("parse_structure", key, value)
@@ -220,7 +225,7 @@ class Maker(object):
                 else:
                     cls, args, kwargs = File, (key,), {}
                     if value is not None:
-                        if isinstance(value, str):
+                        if isinstance(value, (unicode, str)):
                             if value.startswith("@"):
                                 cls = Template
                                 args += (self._get_template(value[1:]),)

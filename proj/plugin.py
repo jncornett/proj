@@ -45,20 +45,32 @@ class PluginManager(object):
 
 
     def _register_hooks(self):
+        hooks = {}
         for plugin in self.plugins:
             for key in plugin.hooks:
                 if key in self.HOOKS:
-                    self.hooks.setdefault(key, []).append(plugin.hooks[key])
+                    hooks.setdefault(key, []).append(plugin.hooks[key])
+
+        return hooks
 
 
     def _get_modules(self, path):
         for entry in os.listdir(path):
             base, ext = os.path.splitext(entry)
             if not ext or ext == ".py":
-                mod_info = (_, _, mod_file, _) = imp.find_module(base, path)
+                self.logger.debug("Processing plugin module %s/%s", path, base)
+                try:
+                    mod_info = imp.find_module(base, [path])
+                except ImportError:
+                    continue
+
                 if mod_info:
+                    mod_file, _, _ = mod_info
                     try:
                         yield imp.load_module(base, *mod_info)
+                    except ImportError:
+                        self.logger.warning("Could not load plugin %r", base)
+                        continue
                     except Exception as e:
                         self._log_plugin_exception(e, module_info=mod_info)
                         if self.debug:
@@ -79,7 +91,12 @@ class PluginManager(object):
 
 
     def trigger(self, hook, *args, **kwargs):
-        hook_fns = self.hooks[hook]
+        try:
+            hook_fns = self.hooks[hook]
+        except KeyError:
+            logging.debug("No plugins exist for hook %r", hook)
+            return
+
         rv = None
         for fn in hook_fns:
             try:
