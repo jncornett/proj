@@ -68,13 +68,20 @@
             
             <div class="content"><div class='highlight'><pre><span class="hljs-keyword">import</span> logging
 <span class="hljs-keyword">import</span> os
+<span class="hljs-keyword">import</span> shlex
 <span class="hljs-keyword">from</span> abc <span class="hljs-keyword">import</span> ABCMeta, abstractmethod, abstractproperty
+<span class="hljs-keyword">from</span> itertools <span class="hljs-keyword">import</span> chain
 <span class="hljs-keyword">from</span> subprocess <span class="hljs-keyword">import</span> check_call
 
 <span class="hljs-keyword">from</span> .util <span class="hljs-keyword">import</span> touch, mkdirp, find_dirs_containing
 <span class="hljs-keyword">from</span> .plugin <span class="hljs-keyword">import</span> PluginManager
 
-logger = logging.getLogger(__name__)</pre></div></div>
+logger = logging.getLogger(__name__)
+
+HOOKS = {
+    <span class="hljs-string">"augment_data"</span>,
+    <span class="hljs-string">"parse_structure"</span>
+    }</pre></div></div>
             
         </li>
         
@@ -104,7 +111,7 @@ logger = logging.getLogger(__name__)</pre></div></div>
     <span class="hljs-function"><span class="hljs-keyword">def</span> <span class="hljs-title">__getattr__</span><span class="hljs-params">(self, attr)</span>:</span>
         <span class="hljs-keyword">return</span> self.config.get(attr, <span class="hljs-keyword">None</span>)
 
-
+    
     <span class="hljs-function"><span class="hljs-keyword">def</span> <span class="hljs-title">_to_path</span><span class="hljs-params">(self, *keys)</span>:</span>
         components = (self.data[key] 
                       <span class="hljs-keyword">for</span> key <span class="hljs-keyword">in</span> keys <span class="hljs-keyword">if</span> key <span class="hljs-keyword">in</span> self.data)
@@ -206,7 +213,15 @@ logger = logging.getLogger(__name__)</pre></div></div>
     <span class="hljs-function"><span class="hljs-keyword">def</span> <span class="hljs-title">__init__</span><span class="hljs-params">(self, name, text=None, **config)</span>:</span>
         super(File, self).__init__(**config)
         self.text = text
-        self.data[<span class="hljs-string">"name"</span>] = name
+        self.name = self.data[<span class="hljs-string">"name"</span>] = name
+
+
+    <span class="hljs-function"><span class="hljs-keyword">def</span> <span class="hljs-title">__repr__</span><span class="hljs-params">(self)</span>:</span>
+        <span class="hljs-keyword">return</span> <span class="hljs-string">"{}({!r}, text={!r})"</span>.format(
+            self.__class__.__name__,
+            self.name,
+            self.text
+            )
 
 
     <span class="hljs-function"><span class="hljs-keyword">def</span> <span class="hljs-title">render</span><span class="hljs-params">(self)</span>:</span>
@@ -223,7 +238,15 @@ logger = logging.getLogger(__name__)</pre></div></div>
             **config
             )
 
-        self.data[<span class="hljs-string">"name"</span>] = name
+        self.name = self.data[<span class="hljs-string">"name"</span>] = name
+
+
+    <span class="hljs-function"><span class="hljs-keyword">def</span> <span class="hljs-title">__repr__</span><span class="hljs-params">(self)</span>:</span>
+        <span class="hljs-keyword">return</span> <span class="hljs-string">"{}({!r}, contents={!r})"</span>.format(
+            self.__class__.__name__,
+            self.name,
+            self.contents
+            )
 
 
     <span class="hljs-function"><span class="hljs-keyword">def</span> <span class="hljs-title">render</span><span class="hljs-params">(self)</span>:</span>
@@ -239,6 +262,14 @@ logger = logging.getLogger(__name__)</pre></div></div>
         self.template = template
 
 
+    <span class="hljs-function"><span class="hljs-keyword">def</span> <span class="hljs-title">__repr__</span><span class="hljs-params">(self)</span>:</span>
+        <span class="hljs-keyword">return</span> <span class="hljs-string">"{}({!r}, template={!r})"</span>.format(
+            self.__class__.__name__,
+            self.name,
+            self.template
+            )
+
+
     <span class="hljs-function"><span class="hljs-keyword">def</span> <span class="hljs-title">render</span><span class="hljs-params">(self)</span>:</span>
         <span class="hljs-keyword">with</span> open(self.file_path, <span class="hljs-string">"w"</span>) <span class="hljs-keyword">as</span> f:
             f.write(self.template.format(**self.data))
@@ -250,7 +281,14 @@ logger = logging.getLogger(__name__)</pre></div></div>
 
     <span class="hljs-function"><span class="hljs-keyword">def</span> <span class="hljs-title">__init__</span><span class="hljs-params">(self, cmd, **config)</span>:</span>
         super(ShellCommand, self).__init__(**config)
-        self.data[<span class="hljs-string">"cmd"</span>] = cmd
+        self.cmd = self.data[<span class="hljs-string">"cmd"</span>] = cmd
+
+
+    <span class="hljs-function"><span class="hljs-keyword">def</span> <span class="hljs-title">__repr__</span><span class="hljs-params">(self)</span>:</span>
+        <span class="hljs-keyword">return</span> <span class="hljs-string">"{}({!r})"</span>.format(
+            self.__class__.__name__,
+            self.cmd
+            )
 
 
     <span class="hljs-function"><span class="hljs-keyword">def</span> <span class="hljs-title">_format_cmd</span><span class="hljs-params">(self)</span>:</span>
@@ -285,10 +323,10 @@ logger = logging.getLogger(__name__)</pre></div></div>
                 <span class="hljs-keyword">else</span>:
                     cls, args, kwargs = File, (key,), {}
                     <span class="hljs-keyword">if</span> value <span class="hljs-keyword">is</span> <span class="hljs-keyword">not</span> <span class="hljs-keyword">None</span>:
-                        <span class="hljs-keyword">if</span> isinstance(value, basestring):
+                        <span class="hljs-keyword">if</span> isinstance(value, str):
                             <span class="hljs-keyword">if</span> value.startswith(<span class="hljs-string">"@"</span>):
                                 cls = Template
-                                args += self._get_template(value[<span class="hljs-number">1</span>:])
+                                args += (self._get_template(value[<span class="hljs-number">1</span>:]),)
                             <span class="hljs-keyword">elif</span> value.startswith(<span class="hljs-string">"!"</span>):
                                 cls = ShellCommand
                                 args = (shlex.split(value[<span class="hljs-number">1</span>:]),)
@@ -300,7 +338,8 @@ logger = logging.getLogger(__name__)</pre></div></div>
                 
                 <span class="hljs-keyword">yield</span> cls(*args, **dict(self.config, **kwargs))
         <span class="hljs-keyword">else</span>:
-            <span class="hljs-keyword">yield</span> <span class="hljs-keyword">from</span> chain.from_iterable(map(self._build, structure))
+            <span class="hljs-keyword">for</span> node <span class="hljs-keyword">in</span> chain.from_iterable(map(self._build, structure)):
+                <span class="hljs-keyword">yield</span> node
             
 
     <span class="hljs-function"><span class="hljs-keyword">def</span> <span class="hljs-title">make</span><span class="hljs-params">(self, dry_run=False, **data)</span>:</span>

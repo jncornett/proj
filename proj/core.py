@@ -1,12 +1,11 @@
 import logging
 import os
 import shlex
-from abc import ABCMeta, abstractmethod, abstractproperty
+from abc import ABCMeta, abstractmethod
 from itertools import chain
 from subprocess import check_call
 
-from .util import touch, mkdirp, find_dirs_containing
-from .plugin import PluginManager
+from .util import touch, mkdirp
 
 logger = logging.getLogger(__name__)
 
