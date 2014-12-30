@@ -203,13 +203,14 @@ logger = logging.getLogger(__name__)</pre></div></div>
 
     log_info_string = <span class="hljs-string">"Creating file: %(module)s/%(name)s"</span>
 
-    <span class="hljs-function"><span class="hljs-keyword">def</span> <span class="hljs-title">__init__</span><span class="hljs-params">(self, name, **config)</span>:</span>
+    <span class="hljs-function"><span class="hljs-keyword">def</span> <span class="hljs-title">__init__</span><span class="hljs-params">(self, name, text=None, **config)</span>:</span>
         super(File, self).__init__(**config)
+        self.text = text
         self.data[<span class="hljs-string">"name"</span>] = name
 
 
     <span class="hljs-function"><span class="hljs-keyword">def</span> <span class="hljs-title">render</span><span class="hljs-params">(self)</span>:</span>
-        touch(self.file_path)
+        touch(self.file_path, self.text)
 
 
 <span class="hljs-class"><span class="hljs-keyword">class</span> <span class="hljs-title">Directory</span><span class="hljs-params">(Branch)</span>:</span>
@@ -260,64 +261,52 @@ logger = logging.getLogger(__name__)</pre></div></div>
         check_call(self._format_cmd(), cwd=self.module_path)
 
 
-<span class="hljs-function"><span class="hljs-keyword">def</span> <span class="hljs-title">_preprocess</span><span class="hljs-params">(key, value)</span>:</span>
-    <span class="hljs-keyword">pass</span>
+<span class="hljs-class"><span class="hljs-keyword">class</span> <span class="hljs-title">Maker</span><span class="hljs-params">(object)</span>:</span>
+    <span class="hljs-function"><span class="hljs-keyword">def</span> <span class="hljs-title">__init__</span><span class="hljs-params">(self, name, structure, templates, **config)</span>:</span>
+        self.data = config.pop(<span class="hljs-string">"data"</span>, {})
+        self.hooks = config.pop(<span class="hljs-string">"plugin_manager"</span>, <span class="hljs-keyword">None</span>)
+        self.template_path = templates
+        self.config = config
+        self.root = Directory(name, contents=self._build(structure))
+
+    
+    <span class="hljs-function"><span class="hljs-keyword">def</span> <span class="hljs-title">_get_template</span><span class="hljs-params">(self, name)</span>:</span>
+        template_filename = os.path.relpath(self.template_path, name)
+        <span class="hljs-keyword">with</span> open(template_filename) <span class="hljs-keyword">as</span> f:
+            <span class="hljs-keyword">return</span> f.read()
 
 
-<span class="hljs-function"><span class="hljs-keyword">def</span> <span class="hljs-title">_build</span><span class="hljs-params">(hooks, data, **config)</span>:</span>
-    <span class="hljs-keyword">if</span> isinstance(data, list):
-        <span class="hljs-keyword">for</span> item <span class="hljs-keyword">in</span> data:
-            <span class="hljs-keyword">yield</span> _build(hooks, item, **config)
-    <span class="hljs-keyword">else</span>:
-        <span class="hljs-keyword">for</span> key, value <span class="hljs-keyword">in</span> data.items():
-            key, value = preprocess(key, value)
-
-            node_cls, node_data, node_args, node_kwargs = <span class="hljs-keyword">None</span>, value, (key,), {}
-            <span class="hljs-keyword">if</span> hooks:
-                rv = hooks.trigger(<span class="hljs-string">"get_node"</span>, key, value)
+    <span class="hljs-function"><span class="hljs-keyword">def</span> <span class="hljs-title">_build</span><span class="hljs-params">(self, structure)</span>:</span>
+        <span class="hljs-keyword">if</span> hasattr(structure, <span class="hljs-string">"items"</span>):
+            <span class="hljs-keyword">for</span> key, value <span class="hljs-keyword">in</span> structure.items():
+                rv = self.hooks.trigger(<span class="hljs-string">"parse_structure"</span>, key, value)
                 <span class="hljs-keyword">if</span> rv:
-                    node_cls, node_name, node_data = rv
-
-            <span class="hljs-keyword">if</span> node_cls <span class="hljs-keyword">is</span> <span class="hljs-keyword">None</span>:</pre></div></div>
+                    cls, args, kwargs = rv
+                <span class="hljs-keyword">else</span>:
+                    cls, args, kwargs = File, (key,), {}
+                    <span class="hljs-keyword">if</span> value <span class="hljs-keyword">is</span> <span class="hljs-keyword">not</span> <span class="hljs-keyword">None</span>:
+                        <span class="hljs-keyword">if</span> isinstance(value, basestring):
+                            <span class="hljs-keyword">if</span> value.startswith(<span class="hljs-string">"@"</span>):
+                                cls = Template
+                                args += self._get_template(value[<span class="hljs-number">1</span>:])
+                            <span class="hljs-keyword">elif</span> value.startswith(<span class="hljs-string">"!"</span>):
+                                cls = ShellCommand
+                                args = (shlex.split(value[<span class="hljs-number">1</span>:]),)
+                            <span class="hljs-keyword">else</span>:
+                                kwargs = {<span class="hljs-string">"text"</span>: value}
+                        <span class="hljs-keyword">else</span>:
+                            cls = Directory
+                            kwargs = {<span class="hljs-string">"contents"</span>: self._build(value)}
+                
+                <span class="hljs-keyword">yield</span> cls(*args, **dict(self.config, **kwargs))
+        <span class="hljs-keyword">else</span>:
+            <span class="hljs-keyword">yield</span> <span class="hljs-keyword">from</span> chain.from_iterable(map(self._build, structure))
             
-        </li>
-        
-        
-        <li id="section-5">
-            <div class="annotation">
-              
-              <div class="pilwrap ">
-                <a class="pilcrow" href="#section-5">&#182;</a>
-              </div>
-              <p>Use builtin handlers</p>
 
-            </div>
-            
-            <div class="content"><div class='highlight'><pre>                <span class="hljs-keyword">pass</span></pre></div></div>
-            
-        </li>
-        
-        
-        <li id="section-6">
-            <div class="annotation">
-              
-              <div class="pilwrap ">
-                <a class="pilcrow" href="#section-6">&#182;</a>
-              </div>
-              <p>Dispatch</p>
-
-            </div>
-            
-            <div class="content"><div class='highlight'><pre>            <span class="hljs-keyword">if</span> issubclass(node_cls, Branch):
-                node_kwargs[<span class="hljs-string">"contents"</span>] = _build(hooks, node_data, **config)
-
-            <span class="hljs-keyword">yield</span> node_cls(*node_args, **node_kwargs)
-
-
-
-<span class="hljs-function"><span class="hljs-keyword">def</span> <span class="hljs-title">build_template</span><span class="hljs-params">(hooks, name, data, **config)</span>:</span>
-    contents = _build(hooks, data, **config)
-    <span class="hljs-keyword">return</span> Directory(name, contents=contents, **config)</pre></div></div>
+    <span class="hljs-function"><span class="hljs-keyword">def</span> <span class="hljs-title">make</span><span class="hljs-params">(self, dry_run=False, **data)</span>:</span>
+        data = dict(self.data, **data)
+        self.hooks.trigger(<span class="hljs-string">"augment_data"</span>, data, self.config)
+        self.root.make(dry_run=dry_run, **data)</pre></div></div>
             
         </li>
         

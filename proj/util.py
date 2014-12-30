@@ -8,9 +8,13 @@ def mkdirp(path):
         if not os.path.exists(path):
             raise
 
-def touch(path):
-    with open(path, "a"):
-        os.utime(path)
+def touch(path, text=None):
+    with open(path, "a") as f:
+        if text is None:
+            os.utime(path)
+        else:
+            f.write(text)
+
 
 
 def find_dirs_containing(root, pattern, top_only=True):

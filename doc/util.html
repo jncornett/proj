@@ -76,9 +76,13 @@
         <span class="hljs-keyword">if</span> <span class="hljs-keyword">not</span> os.path.exists(path):
             <span class="hljs-keyword">raise</span>
 
-<span class="hljs-function"><span class="hljs-keyword">def</span> <span class="hljs-title">touch</span><span class="hljs-params">(path)</span>:</span>
-    <span class="hljs-keyword">with</span> open(path, <span class="hljs-string">"a"</span>):
-        os.utime(path)
+<span class="hljs-function"><span class="hljs-keyword">def</span> <span class="hljs-title">touch</span><span class="hljs-params">(path, text=None)</span>:</span>
+    <span class="hljs-keyword">with</span> open(path, <span class="hljs-string">"a"</span>) <span class="hljs-keyword">as</span> f:
+        <span class="hljs-keyword">if</span> text <span class="hljs-keyword">is</span> <span class="hljs-keyword">None</span>:
+            os.utime(path)
+        <span class="hljs-keyword">else</span>:
+            f.write(text)
+
 
 
 <span class="hljs-function"><span class="hljs-keyword">def</span> <span class="hljs-title">find_dirs_containing</span><span class="hljs-params">(root, pattern, top_only=True)</span>:</span>

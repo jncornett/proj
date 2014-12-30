@@ -1,5 +1,6 @@
 import logging
 import os
+from unittest import TestCase
 from unittest.mock import MagicMock, call, patch, mock_open
 from util import ClassTester, OpenMocker, \
         PopenMocker, CheckCallMocker
@@ -121,7 +122,7 @@ class TestFile(ClassTester):
                 "root": "a/b"
                 })
 
-            mock_touch.assert_called_with("a/b/c/foo.txt")
+            mock_touch.assert_called_with("a/b/c/foo.txt", None)
 
 
 class TestDirectory(ClassTester):
@@ -196,3 +197,8 @@ class TestShellCommand(ClassTester):
                 ["ls", "batt"],
                 cwd="a/b/c"
                 )
+
+
+class TestMaker(TestCase):
+    def test_main(self):
+        self.assertTrue(False)

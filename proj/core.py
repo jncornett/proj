@@ -8,6 +8,11 @@ from .plugin import PluginManager
 
 logger = logging.getLogger(__name__)
 
+HOOKS = {
+    "augment_data",
+    "parse_structure"
+    }
+
 # ## Base Components
 # ### Node
 # The most basic project component
@@ -101,13 +106,14 @@ class File(Node):
 
     log_info_string = "Creating file: %(module)s/%(name)s"
 
-    def __init__(self, name, **config):
+    def __init__(self, name, text=None, **config):
         super(File, self).__init__(**config)
+        self.text = text
         self.data["name"] = name
 
 
     def render(self):
-        touch(self.file_path)
+        touch(self.file_path, self.text)
 
 
 class Directory(Branch):
@@ -158,36 +164,50 @@ class ShellCommand(Node):
         check_call(self._format_cmd(), cwd=self.module_path)
 
 
-def _preprocess(key, value):
-    pass
+class Maker(object):
+    def __init__(self, name, structure, templates, **config):
+        self.data = config.pop("data", {})
+        self.hooks = config.pop("plugin_manager", None)
+        self.template_path = templates
+        self.config = config
+        self.root = Directory(name, contents=self._build(structure))
+
+    
+    def _get_template(self, name):
+        template_filename = os.path.relpath(self.template_path, name)
+        with open(template_filename) as f:
+            return f.read()
 
 
-def _build(hooks, data, **config):
-    if isinstance(data, list):
-        for item in data:
-            yield _build(hooks, item, **config)
-    else:
-        for key, value in data.items():
-            key, value = preprocess(key, value)
-
-            node_cls, node_data, node_args, node_kwargs = None, value, (key,), {}
-            if hooks:
-                rv = hooks.trigger("get_node", key, value)
+    def _build(self, structure):
+        if hasattr(structure, "items"):
+            for key, value in structure.items():
+                rv = self.hooks.trigger("parse_structure", key, value)
                 if rv:
-                    node_cls, node_name, node_data = rv
+                    cls, args, kwargs = rv
+                else:
+                    cls, args, kwargs = File, (key,), {}
+                    if value is not None:
+                        if isinstance(value, basestring):
+                            if value.startswith("@"):
+                                cls = Template
+                                args += self._get_template(value[1:])
+                            elif value.startswith("!"):
+                                cls = ShellCommand
+                                args = (shlex.split(value[1:]),)
+                            else:
+                                kwargs = {"text": value}
+                        else:
+                            cls = Directory
+                            kwargs = {"contents": self._build(value)}
+                
+                yield cls(*args, **dict(self.config, **kwargs))
+        else:
+            for node in chain.from_iterable(map(self._build, structure)):
+                yield node
+            
 
-            if node_cls is None:
-                # Use builtin handlers
-                pass
-
-            # Dispatch
-            if issubclass(node_cls, Branch):
-                node_kwargs["contents"] = _build(hooks, node_data, **config)
-
-            yield node_cls(*node_args, **node_kwargs)
-
-
-
-def build_template(hooks, name, data, **config):
-    contents = _build(hooks, data, **config)
-    return Directory(name, contents=contents, **config)
+    def make(self, dry_run=False, **data):
+        data = dict(self.data, **data)
+        self.hooks.trigger("augment_data", data, self.config)
+        self.root.make(dry_run=dry_run, **data)
