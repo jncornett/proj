@@ -1,6 +1,8 @@
 import logging
 import os
+import shlex
 from abc import ABCMeta, abstractmethod, abstractproperty
+from itertools import chain
 from subprocess import check_call
 
 from .util import touch, mkdirp, find_dirs_containing
@@ -29,7 +31,7 @@ class Node(object):
     def __getattr__(self, attr):
         return self.config.get(attr, None)
 
-
+    
     def _to_path(self, *keys):
         components = (self.data[key] 
                       for key in keys if key in self.data)
@@ -109,7 +111,15 @@ class File(Node):
     def __init__(self, name, text=None, **config):
         super(File, self).__init__(**config)
         self.text = text
-        self.data["name"] = name
+        self.name = self.data["name"] = name
+
+
+    def __repr__(self):
+        return "{}({!r}, text={!r})".format(
+            self.__class__.__name__,
+            self.name,
+            self.text
+            )
 
 
     def render(self):
@@ -126,7 +136,15 @@ class Directory(Branch):
             **config
             )
 
-        self.data["name"] = name
+        self.name = self.data["name"] = name
+
+
+    def __repr__(self):
+        return "{}({!r}, contents={!r})".format(
+            self.__class__.__name__,
+            self.name,
+            self.contents
+            )
 
 
     def render(self):
@@ -142,6 +160,14 @@ class Template(File):
         self.template = template
 
 
+    def __repr__(self):
+        return "{}({!r}, template={!r})".format(
+            self.__class__.__name__,
+            self.name,
+            self.template
+            )
+
+
     def render(self):
         with open(self.file_path, "w") as f:
             f.write(self.template.format(**self.data))
@@ -153,7 +179,14 @@ class ShellCommand(Node):
 
     def __init__(self, cmd, **config):
         super(ShellCommand, self).__init__(**config)
-        self.data["cmd"] = cmd
+        self.cmd = self.data["cmd"] = cmd
+
+
+    def __repr__(self):
+        return "{}({!r})".format(
+            self.__class__.__name__,
+            self.cmd
+            )
 
 
     def _format_cmd(self):
@@ -188,10 +221,10 @@ class Maker(object):
                 else:
                     cls, args, kwargs = File, (key,), {}
                     if value is not None:
-                        if isinstance(value, basestring):
+                        if isinstance(value, str):
                             if value.startswith("@"):
                                 cls = Template
-                                args += self._get_template(value[1:])
+                                args += (self._get_template(value[1:]),)
                             elif value.startswith("!"):
                                 cls = ShellCommand
                                 args = (shlex.split(value[1:]),)

@@ -109,6 +109,7 @@ class TestBranch(ClassTester):
         for item in self.contents:
             item.make.assert_called_with(dry_run=True, **x)
 
+
 class TestFile(ClassTester):
     def setUp(self):
         self.i = core.File("foo.txt")
@@ -200,5 +201,70 @@ class TestShellCommand(ClassTester):
 
 
 class TestMaker(TestCase):
-    def test_main(self):
-        self.assertTrue(False)
+    class Klass(core.Maker):
+        def __init__(self):
+            pass
+
+    def setUp(self):
+        self.i = self.Klass()
+        self.i.config = {}
+        self.i.data = {}
+
+    def test_get_template(self):
+        with OpenMocker("proj.core") as m_open, \
+                patch("os.path.relpath") as m_relpath:
+            self.i.template_path = "foo/bar"
+            m_relpath.return_value = "foo/buzz"
+            m_open().read.return_value = "foobar\n"
+            rv = self.i._get_template("../buzz")
+
+            m_relpath.assert_called_with("foo/bar", "../buzz")
+            m_open.assert_called_with("foo/buzz")
+            m_open().read.assert_called_with()
+            self.assertEqual(rv, "foobar\n")
+
+    def test_build(self):
+        self.i.hooks = MagicMock(trigger=MagicMock())
+        self.i.hooks.trigger.return_value = None
+        structure = [
+            {
+                "afile": None,
+                "anemptydir": {},
+                "anotheremptydir": [],
+                "adirwithstuff": {
+                    "cmd": "!ls foobar",
+                    "template": "@footemplate",
+                    "afilestuff": "buzzbat"
+                    }
+                },
+            {
+                "bfile": None
+                }
+            ]
+
+        self.i._get_template = MagicMock(return_value="fizz{name}")
+        rv = list(self.i._build(structure))
+        for item in rv:
+            self.assertIsInstance(item, core.Node)
+
+        self.assertEqual(rv[-1].name, 'bfile')
+
+        self.i.hooks.trigger.assert_has_calls([
+            call('parse_structure', 'adirwithstuff', structure[0]['adirwithstuff']),
+            call('parse_structure', 'cmd', '!ls foobar'),
+            call('parse_structure', 'afilestuff', 'buzzbat'),
+            call('parse_structure', 'template', '@footemplate'),
+            call('parse_structure', 'anotheremptydir', []),
+            call('parse_structure', 'afile', None),
+            call('parse_structure', 'anemptydir', {}),
+            call('parse_structure', 'bfile', None)
+            ])
+
+    
+    def test_make(self):
+        self.i.hooks = MagicMock(trigger=MagicMock())
+        self.i.root = MagicMock(make=MagicMock())
+
+        self.i.make(fuzz="buzz")
+        self.i.hooks.trigger.assert_called_with("augment_data", {"fuzz": "buzz"}, {})
+
