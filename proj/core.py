@@ -219,7 +219,7 @@ class Maker(object):
         self.logger.debug("Parsing structure %s", structure)
         if hasattr(structure, "items"):
             for key, value in structure.items():
-                rv = self.hooks.trigger("parse_structure", key, value)
+                rv = self.hooks.trigger("parse_structure", self, key, value)
                 if rv:
                     cls, args, kwargs = rv
                 else:

@@ -7,8 +7,6 @@ dbg = logging.getLogger("debug")
 
 class PluginManager(object):
 
-    HOOKS = set() # A set of hook names to register
-
     def __init__(self, app, plugin_paths, 
                  debug=False, logger=None):
 
@@ -47,9 +45,9 @@ class PluginManager(object):
     def _register_hooks(self):
         hooks = {}
         for plugin in self.plugins:
-            for key in plugin.hooks:
-                if key in self.HOOKS:
-                    hooks.setdefault(key, []).append(plugin.hooks[key])
+            for key, value in vars(plugin).items():
+                if key.startswith("on_"):
+                    hooks.setdefault(key[3:], []).append(value)
 
         return hooks
 
@@ -109,21 +107,5 @@ class PluginManager(object):
         return rv
 
 
-class Plugin(object):
-
-    hooks = {}
-
-    def __init__(self, app):
-        self.app = app
-
-
-    @classmethod
-    def hook(cls, hook_name):
-        def inner(fn):
-            cls.hooks.setdefault(hook_name, []).append(fn.__name__)
-            return fn
-
-        return inner
-
-
-
+class Plugin:
+    pass
